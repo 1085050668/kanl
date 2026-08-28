@@ -1,0 +1,390 @@
+-- 开源来自 WasKKalWe 蛙QwQ
+local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"))()
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local VirtualUser = game:GetService("VirtualUser")
+
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+local Backpack = LocalPlayer:WaitForChild("Backpack")
+
+local Window = WindUI:CreateWindow({
+    Title = "KEG Hub",
+    Icon = "rbxassetid://129260712070622",
+    Size = UDim2.fromOffset(580, 420),
+    Position = UDim2.fromScale(0.5, 0.5),
+    Theme = "Dark"
+})
+
+local MainTab = Window:Tab({ Title = "主要", Icon = "rbxassetid://10468665991" })
+
+local autoAttackEnabled = false
+local heartbeatService = game:GetService("RunService")
+local autoAttackConnection
+local attackRange = 360
+local skillData = {
+    ["Normal Punch"] = { ["rbxassetid://10468665991"] = 21 },
+    ["Flowing Water"] = { ["rbxassetid://10466974800"] = 19 },
+    ["Machine Gun Blows"] = { ["rbxassetid://10471336737"] = 17 },
+    ["Flash Strike"] = { ["rbxassetid://12510170988"] = 18.5 },
+    ["Homerun"] = { ["rbxassetid://12272894215"] = 18.6 },
+    ["Quick Slice"] = { ["rbxassetid://12296882427"] = 21.5 },
+    ["Bullet Barrage"] = { ["rbxassetid://12307656616"] = 22 },
+    ["Crushing Pull"] = { ["rbxassetid://12351854556"] = 23 },
+    ["Atmos Cleave"] = { ["rbxassetid://12534735382"] = 19 },
+    ["Windstorm Fury"] = { ["rbxassetid://12502664044"] = 22 },
+    ["Ignition Burst"] = { ["rbxassetid://12509505723"] = 18.3 },
+    ["Whirlwind Kick"] = { ["rbxassetid://12618292188"] = 21.5 },
+    ["Beatdown"] = { ["rbxassetid://12684185971"] = 24.3 },
+    ["Consecutive Punches"] = { ["rbxassetid://13376869471"] = 23.2 },
+    ["Lethal Whirlwind Stream"] = { ["rbxassetid://13294790250"] = 21 },
+    ["Vanishing Kick"] = { ["rbxassetid://13376962659"] = 21 },
+    ["Shove"] = { ["rbxassetid://13501296372"] = 11 },
+    ["Hunter's Grasp"] = { ["rbxassetid://14004235777"] = 17.8 },
+    ["Blitz Shot"] = { ["rbxassetid://14003607057"] = 26 },
+    ["Scatter"] = { ["rbxassetid://14046756619"] = 22.3 },
+    ["Grand Slam"] = { ["rbxassetid://14048349132"] = 21.7 },
+    ["Pinpoint Cut"] = { ["rbxassetid://14299135500"] = 18 },
+    ["Stone Coffin"] = { ["rbxassetid://14967219354"] = 25.7 },
+    ["Whirlwind Drop"] = { ["rbxassetid://14357997687"] = 15.7 },
+    ["Split Second Counter"] = { ["rbxassetid://14357943487"] = 18.7 },
+    ["Expulsive Push"] = { ["rbxassetid://15290930205"] = 20.7 },
+    ["Jet Dive"] = { ["rbxassetid://15145462680"] = 18.5 },
+    ["Explosive Shuriken"] = { ["rbxassetid://15295895753"] = 22 },
+    ["Foul Ball"] = { ["rbxassetid://15311685628"] = 24.8 },
+    ["Uppercut"] = { ["rbxassetid://16139108718"] = 21 },
+    ["Head First"] = { ["rbxassetid://16139402582"] = 18.5 },
+    ["Prey's Peril"] = { ["rbxassetid://16515850153"] = 18.5 }
+}
+
+local lastSkillUse = {
+    ["rbxassetid://10479335397"] = 0,
+    ["rbxassetid://13380255751"] = 0,
+    ["rbxassetid://10469493270"] = 0,
+    ["rbxassetid://10469630950"] = 0,
+    ["rbxassetid://10469639222"] = 0,
+    ["rbxassetid://10469643643"] = 0,
+    ["rbxassetid://13532562418"] = 0,
+    ["rbxassetid://13491635433"] = 0,
+    ["rbxassetid://13296577783"] = 0,
+    ["rbxassetid://13295919399"] = 0,
+    ["rbxassetid://13370310513"] = 0,
+    ["rbxassetid://13390230973"] = 0,
+    ["rbxassetid://13378751717"] = 0,
+    ["rbxassetid://13378708199"] = 0,
+    ["rbxassetid://14004222985"] = 0,
+    ["rbxassetid://13997092940"] = 0,
+    ["rbxassetid://14001963401"] = 0,
+    ["rbxassetid://14136436157"] = 0,
+    ["rbxassetid://15259161390"] = 0,
+    ["rbxassetid://15240216931"] = 0,
+    ["rbxassetid://15240176873"] = 0,
+    ["rbxassetid://15162694192"] = 0,
+    ["rbxassetid://16515503507"] = 0,
+    ["rbxassetid://16515520431"] = 0,
+    ["rbxassetid://16515448089"] = 0,
+    ["rbxassetid://16552234590"] = 0,
+    ["rbxassetid://17889458563"] = 0,
+    ["rbxassetid://17889461810"] = 0,
+    ["rbxassetid://17889471098"] = 0,
+    ["rbxassetid://17889290569"] = 0
+}
+
+local function getNearbyPlayers(range)
+    local nearby = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local targetHRP = player.Character:FindFirstChild("HumanoidRootPart")
+            if targetHRP then
+                local dist = (HumanoidRootPart.Position - targetHRP.Position).Magnitude
+                if dist <= range then
+                    table.insert(nearby, player)
+                end
+            end
+        end
+    end
+    return nearby
+end
+
+local function getClosestPlayer()
+    local closest = nil
+    local minDist = math.huge
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local targetHRP = player.Character:FindFirstChild("HumanoidRootPart")
+            if targetHRP then
+                local dist = (HumanoidRootPart.Position - targetHRP.Position).Magnitude
+                if dist < minDist then
+                    minDist = dist
+                    closest = player
+                end
+            end
+        end
+    end
+    return closest, minDist
+end
+
+local function useSkill(skillName, target)
+    local tool = Backpack:FindFirstChild(skillName) or Character:FindFirstChild(skillName)
+    if tool then
+        Humanoid:EquipTool(tool)
+        if target and target.Character then
+            local targetHRP = target.Character:FindFirstChild("HumanoidRootPart")
+            if targetHRP then
+                HumanoidRootPart.CFrame = CFrame.new(HumanoidRootPart.Position, targetHRP.Position)
+            end
+        end
+        tool:Activate()
+    end
+end
+
+local function autoAttack()
+    local target, dist = getClosestPlayer()
+    if target and dist <= 50 then
+        for skillName, data in pairs(skillData) do
+            for animId, cooldown in pairs(data) do
+                if tick() - (lastSkillUse[animId] or 0) >= cooldown then
+                    useSkill(skillName, target)
+                    lastSkillUse[animId] = tick()
+                    break
+                end
+            end
+        end
+    end
+end
+
+local function autoFarm()
+    local target, dist = getClosestPlayer()
+    if target and dist <= attackRange then
+        local targetHRP = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+        if targetHRP then
+            local targetHumanoid = target.Character:FindFirstChild("Humanoid")
+            if targetHumanoid and targetHumanoid.Health > 0 then
+                HumanoidRootPart.CFrame = targetHRP.CFrame * CFrame.new(0, 0, 3)
+                autoAttack()
+            end
+        end
+    end
+end
+
+local autoFarmConnection
+local skill1Enabled = false
+local skill2Enabled = false
+local skill3Enabled = false
+local skill4Enabled = false
+local autoDodgeEnabled = false
+local rangeText = ""
+
+local function getAnimationId(animTrack)
+    if animTrack and animTrack.Animation then
+        return animTrack.Animation.AnimationId
+    end
+    return nil
+end
+
+local function isSkillAnimation(animId)
+    for skillName, data in pairs(skillData) do
+        for id, _ in pairs(data) do
+            if id == animId then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function onCharacterAdded(newChar)
+    Character = newChar
+    Humanoid = Character:WaitForChild("Humanoid")
+    HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+end
+
+LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
+
+MainTab:Toggle({
+    Title = "自动攻击",
+    Description = "自动对附近玩家使用技能",
+    Value = false,
+    Callback = function(value)
+        autoAttackEnabled = value
+        if autoAttackEnabled then
+            autoAttackConnection = RunService.Heartbeat:Connect(function()
+                if autoAttackEnabled then
+                    autoAttack()
+                end
+            end)
+        elseif autoAttackConnection then
+            autoAttackConnection:Disconnect()
+            autoAttackConnection = nil
+        end
+    end
+})
+
+MainTab:Toggle({
+    Title = "自动农场",
+    Description = "自动寻找并攻击玩家",
+    Value = false,
+    Callback = function(value)
+        if value then
+            autoFarmConnection = RunService.Heartbeat:Connect(autoFarm)
+        elseif autoFarmConnection then
+            autoFarmConnection:Disconnect()
+            autoFarmConnection = nil
+        end
+    end
+})
+
+MainTab:Textbox({
+    Title = "攻击范围",
+    Description = "设置自动攻击范围",
+    Value = "50",
+    Callback = function(value)
+        rangeText = value
+        local num = tonumber(value)
+        if num then
+            attackRange = num
+        end
+    end
+})
+
+MainTab:Button({
+    Title = "重置范围",
+    Callback = function()
+        rangeText = "50"
+        attackRange = 50
+        rangeCache = nil
+    end
+})
+
+MainTab:Toggle({
+    Title = "技能1",
+    Description = "启用第一技能",
+    Value = false,
+    Callback = function(value)
+        skill1Enabled = value
+    end
+})
+
+MainTab:Toggle({
+    Title = "技能2",
+    Description = "启用第二技能",
+    Value = false,
+    Callback = function(value)
+        skill2Enabled = value
+    end
+})
+
+MainTab:Toggle({
+    Title = "技能3",
+    Description = "启用第三技能",
+    Value = false,
+    Callback = function(value)
+        skill3Enabled = value
+    end
+})
+
+MainTab:Toggle({
+    Title = "技能4",
+    Description = "启用第四技能",
+    Value = false,
+    Callback = function(value)
+        skill4Enabled = value
+    end
+})
+
+MainTab:Toggle({
+    Title = "无限闪避",
+    Description = "自动闪避攻击",
+    Value = false,
+    Callback = function(value)
+        autoDodgeEnabled = value
+    end
+})
+
+RunService.Heartbeat:Connect(function()
+    if autoDodgeEnabled then
+        local target, dist = getClosestPlayer()
+        if target and dist <= 15 then
+            local targetHRP = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+            if targetHRP then
+                local targetHumanoid = target.Character:FindFirstChild("Humanoid")
+                if targetHumanoid then
+                    local animTracks = targetHumanoid:GetPlayingAnimationTracks()
+                    for _, track in ipairs(animTracks) do
+                        local animId = getAnimationId(track)
+                        if animId and isSkillAnimation(animId) then
+                            local dodgeDirection = (HumanoidRootPart.Position - targetHRP.Position).unit
+                            HumanoidRootPart.CFrame = HumanoidRootPart.CFrame + dodgeDirection * 20
+                            break
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+local CombatTab = Window:Tab({ Title = "战斗", Icon = "rbxassetid://10471336737" })
+
+CombatTab:Dropdown({
+    Title = "目标选择",
+    Values = {"最近", "最低血量", "最高伤害"},
+    Multi = false,
+    Default = "最近",
+    Callback = function(value)
+    end
+})
+
+CombatTab:Dropdown({
+    Title = "技能优先级",
+    Values = {"Normal Punch", "Flowing Water", "Machine Gun Blows", "Flash Strike", "Homerun", "Quick Slice", "Bullet Barrage", "Crushing Pull"},
+    Multi = true,
+    Default = {},
+    Callback = function(values)
+    end
+})
+
+local MiscTab = Window:Tab({ Title = "其他", Icon = "rbxassetid://12510170988" })
+
+MiscTab:Toggle({
+    Title = "反AFK",
+    Description = "防止被踢出",
+    Value = true,
+    Callback = function(value)
+        if value then
+            local antiAfkConnection
+            antiAfkConnection = LocalPlayer.Idled:Connect(function()
+                VirtualUser:Button2Down(Vector2.new(0, 0), Workspace.CurrentCamera.CFrame)
+                wait(1)
+                VirtualUser:Button2Up(Vector2.new(0, 0), Workspace.CurrentCamera.CFrame)
+            end)
+        end
+    end
+})
+
+MiscTab:Button({
+    Title = "重新加入",
+    Callback = function()
+        TeleportService:Teleport(game.PlaceId, LocalPlayer)
+    end
+})
+
+MiscTab:Button({
+    Title = "服务器跳转",
+    Callback = function()
+        local servers = HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+        for _, server in ipairs(servers.data) do
+            if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LocalPlayer)
+                break
+            end
+        end
+    end
+})
